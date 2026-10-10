@@ -212,8 +212,23 @@ export const register: Register = on => {
 
   // Abre o painel e também responde com um resumo em texto, que aparece
   // mesmo onde a superfície não mostra painéis.
-  on('command.run', { command: 'painel-uso' }, async $ => {
+  on('command.run', { command: 'painel-uso' }, async ($, e) => {
     const aberto = await $.ui.open({ ...ABERTURA })
+    if (e.args.trim() === 'diag') {
+      const superficies = await $.session.surfaces().catch(() => [])
+      const paines = await $.ui.panes().catch(() => [])
+      const versao = await $.session.version().catch(() => null)
+      const uso = await $.session.usage().catch(() => null)
+      return {
+        text: [
+          `diag painel-uso ${versao?.version ?? '?'}`,
+          `superfícies: ${superficies.join(', ') || 'nenhuma'}`,
+          `ui.open: ${aberto.isPlaced ? 'colocado' : `não colocado (${aberto.reason})`}`,
+          `painéis: ${paines.map(p => `${p.id} shown=${p.isShown} placed=${p.isPlaced}`).join('; ') || 'nenhum'}`,
+          `limites lidos: ${uso?.rateLimits.map(r => `${r.kind} ${r.percentUsed}%`).join(', ') || 'nenhum'}`,
+        ].join('\n'),
+      }
+    }
     await update($, faixaOculta, () => false)
     try {
       await lerUso($)
