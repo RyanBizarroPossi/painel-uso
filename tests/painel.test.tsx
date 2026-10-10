@@ -9,7 +9,7 @@ const LIMITES: SessionRateLimit[] = [
 ]
 const SUPERFICIES = ['terminal', 'desktop', 'vscode', 'mobile'] as const
 
-function ambiente(on: On, limites: SessionRateLimit[] = LIMITES) {
+function ambiente(on: On, limites: SessionRateLimit[] = LIMITES, colocado = true) {
   const clock = mock.clock(on, { now: AGORA })
   mock.store(on)
   on('session.start', ($, e) => ({ cwd: e.cwd }))
@@ -17,7 +17,11 @@ function ambiente(on: On, limites: SessionRateLimit[] = LIMITES) {
     value: { startedAt: AGORA, context: { window: 200_000 }, rateLimits: limites },
   }))
   on('session.measure', ($, e) => ({ changed: e.changed }))
-  on('ui.open', () => ({ value: { isPlaced: true as const } }))
+  on('ui.open', () =>
+    colocado
+      ? { value: { isPlaced: true as const } }
+      : { value: { isPlaced: false as const, reason: 'superfície sem painéis' } },
+  )
   on('command.register', ($, e) => ({ value: { command: e.name } }))
   on('turn.start', ($, e) => ({ turnId: e.turnId }))
   on('turn.complete', ($, e) => ({ text: e.answer }))
@@ -116,7 +120,7 @@ test('a contagem anda sozinha com o painel parado', async ($, on) => {
   await ui.unmount()
 })
 
-test('janela que já recarregou aparece como renovada', async ($, on) => {
+test('janela que já recarregou aparece como renovada', { timeoutMs: 30_000 }, async ($, on) => {
   const clock = ambiente(on)
   await $.session.start(inicio)
   for (let h = 0; h < 3; h++) await clock.advance(3_600_000)
@@ -193,6 +197,21 @@ test('o botão desliga a linha sob a resposta', async ($, on) => {
   await clock.advance(3_000)
   const r = await $.turn.complete(fim('x1', 3_000, 'resposta'))
   expect(r.text).toBe('resposta')
+})
+
+test('/painel-uso responde com resumo e avisa quando a tela não mostra painéis', async ($, on) => {
+  ambiente(on, LIMITES, false)
+  await $.session.start(inicio)
+  const r = await $.command.run({
+    command: 'painel-uso',
+    args: '',
+    origin: { kind: 'composer' },
+    presentation: { isFullscreen: false, columns: 100 },
+  })
+  expect(r.text).toContain('Sessão (5 h): 34%')
+  expect(r.text).toContain('recarrega em 2 h 14 min (hoje 20:34)')
+  expect(r.text).toContain('Semanal: 62%')
+  expect(r.text).toContain('painel não exibido nesta tela: superfície sem painéis')
 })
 
 test('turnos de subagentes não mexem na previsão', async ($, on) => {

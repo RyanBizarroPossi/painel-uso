@@ -132,6 +132,34 @@ async function tick($: EngineInterface) {
   }
 }
 
+async function resumoTexto($: EngineInterface): Promise<string> {
+  const t = await $.clock.now()
+  const l = await read($, leitura)
+  const u = await read($, ultima)
+  const s = await read($, estatisticas)
+  const linhas: string[] = []
+  const janelas = [...(l?.janelas ?? [])].sort((a, b) => ordem(a.kind) - ordem(b.kind))
+  if (janelas.length === 0) linhas.push('Limites: aparecem após a próxima resposta.')
+  for (const j of janelas) {
+    const reset = j.resetsAt === undefined ? Number.NaN : Date.parse(j.resetsAt)
+    const renovada = Number.isFinite(reset) && reset <= t
+    const pct = renovada ? 0 : Math.max(0, Math.min(100, j.percentUsed))
+    const b = barra(pct / 100, 20)
+    const fim = !Number.isFinite(reset)
+      ? ''
+      : renovada
+        ? ' · renovada'
+        : ` · recarrega em ${contagem(reset - t)} (${horaLocal(reset, t)})`
+    linhas.push(`${rotulo(j.kind).longo}: ${percentual(pct)} ${b.cheio}${b.vazio.replace(/━/g, '─')}${fim}`)
+  }
+  if (u !== null) {
+    linhas.push(`Último pedido: previsto ${duracao(u.previstoMs)} · levou ${duracao(u.realMs)} (${desvio(u.desvioPct)})`)
+  }
+  if (s.erroMedioPct !== null) linhas.push(`Erro médio (20 últimos): ${s.erroMedioPct}% · ${s.amostras} pedidos medidos`)
+  else if (s.amostras > 0) linhas.push(`${s.amostras} ${s.amostras === 1 ? 'pedido medido' : 'pedidos medidos'}`)
+  return linhas.join('\n')
+}
+
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     const salvo = await $.store.get('historico')
@@ -162,9 +190,18 @@ export const register: Register = on => {
     return next(e)
   })
 
+  // Abre o painel e também responde com um resumo em texto, que aparece
+  // mesmo onde a superfície não mostra painéis.
   on('command.run', { command: 'painel-uso' }, async $ => {
-    await $.ui.open({ ...ABERTURA })
-    return { text: 'Painel de uso e previsão aberto.' }
+    const aberto = await $.ui.open({ ...ABERTURA })
+    try {
+      await lerUso($)
+    } catch {
+      // segue com a última leitura
+    }
+    const resumo = await resumoTexto($)
+    const aviso = aberto.isPlaced ? '' : `\n\n(painel não exibido nesta tela: ${aberto.reason})`
+    return { text: resumo + aviso }
   })
 
   // Os limites chegam empurrados pelo engine: após cada resposta e quando uma
