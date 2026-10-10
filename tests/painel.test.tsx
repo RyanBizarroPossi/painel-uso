@@ -22,6 +22,8 @@ function ambiente(on: On, limites: SessionRateLimit[] = LIMITES, colocado = true
       ? { value: { isPlaced: true as const } }
       : { value: { isPlaced: false as const, reason: 'superfície sem painéis' } },
   )
+  on('ui.scroll', () => ({}))
+  on('ui.panes', () => ({ value: [] }))
   on('command.register', ($, e) => ({ value: { command: e.name } }))
   on('turn.start', ($, e) => ({ turnId: e.turnId }))
   on('turn.complete', ($, e) => ({ text: e.answer }))

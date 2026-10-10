@@ -220,8 +220,21 @@ export const register: Register = on => {
     } catch {
       // segue com a última leitura
     }
+    try {
+      await $.ui.scroll({ in: PANE, to: 'start' })
+    } catch {
+      // superfície sem rolagem: segue
+    }
     const resumo = await resumoTexto($)
-    const aviso = aberto.isPlaced ? '' : `\n\n(painel não exibido nesta tela: ${aberto.reason})`
+    const pane = await $.ui.panes().then(
+      lista => lista.find(p => p.id === PANE),
+      () => undefined,
+    )
+    const aviso = !aberto.isPlaced
+      ? `\n\n(painel não exibido nesta tela: ${aberto.reason})`
+      : pane !== undefined && !pane.isShown
+        ? '\n\n(painel aberto atrás de outra aba)'
+        : ''
     return { text: resumo + aviso }
   })
 
