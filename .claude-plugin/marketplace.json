@@ -1,0 +1,14 @@
+{
+  "name": "painel-uso",
+  "description": "Painel de uso e previsão de tempo para o Claude",
+  "owner": {
+    "name": "Ryan"
+  },
+  "plugins": [
+    {
+      "name": "painel-uso",
+      "source": "./",
+      "description": "Uso da sessão (5 h) e semanal com tempo até recarregar, e previsão de tempo por pedido que aprende com o real."
+    }
+  ]
+}
