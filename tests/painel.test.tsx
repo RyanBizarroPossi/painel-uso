@@ -214,6 +214,38 @@ test('/painel-uso responde com resumo e avisa quando a tela não mostra painéis
   expect(r.text).toContain('painel não exibido nesta tela: superfície sem painéis')
 })
 
+test('faixa acima do prompt mostra o resumo e pode ser ocultada', async ($, on) => {
+  ambiente(on)
+  on('ui.render', { component: 'AbovePrompt' }, ($, e) => {
+    const { Text } = $.ui.resolve(e)
+    return <Text>faixa do app</Text>
+  })
+  await $.session.start(inicio)
+  for (const surface of SUPERFICIES) {
+    const ui = await $.ui.mount({
+      plugin: PLUGIN,
+      surface,
+      component: 'AbovePrompt',
+      props: {
+        hasSurvey: false,
+        isWorking: false,
+        maxRows: 10,
+        bodyColumns: 80,
+        scroll: { offset: 0, bodyRows: 10 },
+        view: {},
+      },
+    })
+    expect(await ui.find({ type: 'Text', text: 'Sessão' })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: ' ↻2h14' })).toBeDefined()
+    if (surface === 'mobile') {
+      await ui.press({ key: 'ocultar-faixa' })
+      expect(await ui.find({ type: 'Text', text: 'Sessão' })).toBeUndefined()
+      expect(await ui.find({ type: 'Text', text: 'faixa do app' })).toBeDefined()
+    }
+    await ui.unmount()
+  }
+})
+
 test('turnos de subagentes não mexem na previsão', async ($, on) => {
   const clock = ambiente(on)
   await $.session.start(inicio)

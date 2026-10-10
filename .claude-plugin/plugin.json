@@ -1,10 +1,8 @@
 {
   "name": "painel-uso",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Painel lateral com o uso da sessão (5 h) e semanal, o tempo até recarregar e uma previsão de tempo por pedido que aprende comparando previsto e real.",
-  "author": {
-    "name": "Ryan"
-  },
-  "types": "./types/index.d.ts",
-  "repository": "https://github.com/RyanBizarroPossi/painel-uso"
+  "author": { "name": "Ryan" },
+  "repository": "https://github.com/RyanBizarroPossi/painel-uso",
+  "types": "./types/index.d.ts"
 }

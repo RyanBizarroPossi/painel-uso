@@ -44,6 +44,7 @@ const estatisticas = atom({ plugin: 'painel-uso', key: 'estatisticas' } as const
   erroAnteriorPct: null,
 })
 const mostrarLinha = atom({ plugin: 'painel-uso', key: 'mostrarLinha' } as const, true)
+const faixaOculta = atom({ plugin: 'painel-uso', key: 'faixaOculta' } as const, false)
 
 type Pecas = {
   Box: ElementConstructor<BoxProps>
@@ -130,6 +131,25 @@ async function tick($: EngineInterface) {
     ultimaLeituraUso = t
     await lerUso($)
   }
+  await atualizarStatus($)
+}
+
+// Uma linha para a status line: sempre visível sob o prompt.
+async function atualizarStatus($: EngineInterface) {
+  const t = await $.clock.now()
+  const l = await read($, leitura)
+  const x = await read($, execucao)
+  const partes: string[] = []
+  for (const j of [...(l?.janelas ?? [])].sort((a, b) => ordem(a.kind) - ordem(b.kind))) {
+    if (ordem(j.kind) > 1) continue
+    const reset = j.resetsAt === undefined ? Number.NaN : Date.parse(j.resetsAt)
+    const renovada = Number.isFinite(reset) && reset <= t
+    const pct = renovada ? 0 : j.percentUsed
+    const fim = !Number.isFinite(reset) ? '' : renovada ? ' ↻ok' : ` ↻${contagemCurta(reset - t)}`
+    partes.push(`${rotulo(j.kind).curto} ${percentual(pct)}${fim}`)
+  }
+  if (x !== null) partes.push(`⏱ ${relogio(Math.max(0, t - x.inicio))} de ~${relogio(x.estimadoMs)}`)
+  $.ui.status(partes.length > 0 ? partes.join(' · ') : undefined)
 }
 
 async function resumoTexto($: EngineInterface): Promise<string> {
@@ -194,6 +214,7 @@ export const register: Register = on => {
   // mesmo onde a superfície não mostra painéis.
   on('command.run', { command: 'painel-uso' }, async $ => {
     const aberto = await $.ui.open({ ...ABERTURA })
+    await update($, faixaOculta, () => false)
     try {
       await lerUso($)
     } catch {
@@ -319,6 +340,38 @@ export const register: Register = on => {
       ...r,
       text: linhaComparacao(x.previstoMs, e.durationMs, stats.erroMedioPct, x.nivel === 'inicial'),
     }
+  })
+
+  // Faixa fixa acima do prompt: a versão compacta, visível em qualquer tela.
+  on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
+    if (e.props.hasSurvey || (await read($, faixaOculta))) return next(e)
+    const { Box, Text, Button } = $.ui.resolve(e)
+    const [l, t, x, u, s, linha] = await Promise.all([
+      read($, leitura),
+      read($, agora),
+      read($, execucao),
+      read($, ultima),
+      read($, estatisticas),
+      read($, mostrarLinha),
+    ])
+    const dados: Dados = {
+      janelas: [...(l?.janelas ?? [])].sort((a, b) => ordem(a.kind) - ordem(b.kind)),
+      agoraMs: t > 0 ? t : await $.clock.now(),
+      colunas: Math.max(30, Math.min(100, e.props.bodyColumns - 8)),
+      exec: x,
+      ultimaComp: u,
+      stats: s,
+      linha,
+      alternar: async () => undefined,
+    }
+    return (
+      <Box>
+        <Box flexGrow={1}>{compacto({ Box, Text, Button }, dados)}</Box>
+        <Button key="ocultar-faixa" plain onPress={() => update($, faixaOculta, () => true)}>
+          ×
+        </Button>
+      </Box>
+    )
   })
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {

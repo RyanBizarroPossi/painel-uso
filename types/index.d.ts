@@ -46,6 +46,7 @@ declare module 'claude-code' {
       ultima: Comparacao | null
       estatisticas: Estatisticas
       mostrarLinha: boolean
+      faixaOculta: boolean
     }
   }
 }
